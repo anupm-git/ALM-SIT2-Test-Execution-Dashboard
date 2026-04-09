@@ -38,6 +38,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-mono);height:
 .tab-panel.active{display:flex}
 #tab-roadmap{flex-direction:row}
 #tab-dashboard{flex-direction:column}
+#tab-issuedata{flex-direction:column}
 
 /* BUTTONS */
 .btn{font-family:var(--font-mono);font-size:0.76rem;padding:6px 13px;border-radius:var(--radius);
@@ -456,8 +457,28 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-mono);height:
 .spinner{width:14px;height:14px;border:2px solid var(--border);border-top-color:var(--accent);
   border-radius:50%;animation:spin 0.7s linear infinite;display:none}
 .spinner.active{display:block}
-@keyframes spin{to{transform:rotate(360deg)}}
-</style>
+/* ═══════════════════════════
+   ISSUE DATA TAB
+═══════════════════════════ */
+#idTable thead th{
+  position:sticky;top:0;z-index:10;
+  background:var(--surface);border-bottom:2px solid var(--border);
+  padding:7px 10px;text-align:left;font-size:0.64rem;font-weight:600;
+  color:var(--text2);text-transform:uppercase;letter-spacing:0.5px;
+  cursor:pointer;white-space:nowrap;user-select:none;transition:color 0.15s}
+#idTable thead th:hover{color:var(--accent)}
+#idTable thead th.sort-asc::after{content:' ↑';color:var(--accent)}
+#idTable thead th.sort-desc::after{content:' ↓';color:var(--accent)}
+#idTable tbody tr{border-bottom:1px solid var(--border);transition:background 0.1s}
+#idTable tbody tr:hover{background:rgba(26,95,168,0.06)}
+#idTable tbody td{padding:6px 10px;vertical-align:top;color:var(--text);max-width:260px}
+#idTable tbody td.td-key{font-size:0.64rem;color:var(--accent);font-weight:500;white-space:nowrap}
+#idTable tbody td.td-summary{font-size:0.72rem;line-height:1.4;color:var(--text)}
+#idTable tbody td.td-mono{font-family:var(--font-mono);font-size:0.65rem;white-space:nowrap;color:var(--text2)}
+#idTable tbody td.td-trunc{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:200px}
+#idTable tbody tr:nth-child(even){background:rgba(0,0,0,0.018)}
+#idTable tbody tr:nth-child(even):hover{background:rgba(26,95,168,0.07)}
+
 </head>
 <body>
 
@@ -479,6 +500,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-mono);height:
 <div class="main-tabs">
   <button class="main-tab active" onclick="switchMainTab('roadmap',this)">🗺️ Jira Roadmap</button>
   <button class="main-tab" onclick="switchMainTab('dashboard',this)">📊 Jira Dashboard</button>
+  <button class="main-tab" onclick="switchMainTab('issuedata',this)">📋 Issue Data</button>
 </div>
 
 <!-- ═══ JIRA ROADMAP TAB ═══ -->
@@ -643,6 +665,59 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-mono);height:
 
 </div><!-- /tab-dashboard -->
 
+<!-- ═══ ISSUE DATA TAB ═══ -->
+<div class="tab-panel" id="tab-issuedata">
+
+  <!-- Top bar -->
+  <div class="dash-topbar" style="flex-wrap:wrap;gap:8px;align-items:center">
+    <span style="font-family:var(--font-head);font-size:0.82rem;font-weight:700;color:var(--text2)">📋 Issue Data</span>
+    <span id="idTotalBadge" style="font-size:0.66rem;background:rgba(26,95,168,0.1);border:1px solid rgba(26,95,168,0.25);
+      border-radius:10px;padding:2px 9px;color:var(--accent);font-weight:600">0 issues</span>
+    <span style="font-size:0.66rem;color:var(--text3)" id="idSourceNote">— load data via Jira Dashboard JQL first</span>
+    <div style="margin-left:auto;display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+      <!-- Search -->
+      <input id="idSearch" class="dash-jql-input" style="width:200px;padding:5px 10px"
+        placeholder="🔍 Search key, summary, assignee…" oninput="idApplyFilters()"/>
+      <!-- Status filter -->
+      <select id="idStatusFilter" class="dash-jql-input" style="width:130px;padding:5px 8px" onchange="idApplyFilters()">
+        <option value="">All Statuses</option>
+      </select>
+      <!-- Story Type filter -->
+      <select id="idStoryTypeFilter" class="dash-jql-input" style="width:140px;padding:5px 8px" onchange="idApplyFilters()">
+        <option value="">All Story Types</option>
+      </select>
+      <!-- Component filter -->
+      <select id="idCompFilter" class="dash-jql-input" style="width:140px;padding:5px 8px" onchange="idApplyFilters()">
+        <option value="">All Components</option>
+      </select>
+      <!-- Export -->
+      <button class="btn btn-sm" onclick="idExportCSV()" title="Export visible rows to CSV">⬇ CSV</button>
+    </div>
+  </div>
+
+  <!-- Table wrapper -->
+  <div id="idTableWrap" style="flex:1;overflow:auto;min-height:0;position:relative">
+    <div id="idEmpty" style="display:flex;flex-direction:column;align-items:center;justify-content:center;
+      height:100%;gap:11px;color:var(--text3);text-align:center;padding:40px">
+      <div style="font-size:2rem;opacity:0.4">📭</div>
+      <div style="font-family:var(--font-head);font-size:0.9rem;color:var(--text2)">No issue data yet</div>
+      <div style="font-size:0.76rem">Apply a JQL query on the Jira Dashboard tab first.</div>
+    </div>
+    <table id="idTable" style="display:none;width:100%;border-collapse:collapse;font-size:0.72rem;min-width:900px">
+      <thead id="idThead"></thead>
+      <tbody id="idTbody"></tbody>
+    </table>
+  </div>
+
+  <!-- Footer count -->
+  <div style="padding:5px 14px;background:var(--surface);border-top:1px solid var(--border);
+    font-size:0.64rem;color:var(--text3);flex-shrink:0;display:flex;align-items:center;gap:8px">
+    <span id="idFooterCount"></span>
+    <span style="margin-left:auto">Click column header to sort</span>
+  </div>
+
+</div><!-- /tab-issuedata -->
+
 <!-- TOAST -->
 <div class="toast-area" id="toastArea"></div>
 
@@ -787,6 +862,7 @@ function switchMainTab(id, el) {
   el.classList.add('active');
   document.getElementById('tab-' + id).classList.add('active');
   if (id === 'dashboard' && dashIssues.length) dashShowComponents();
+  if (id === 'issuedata') idLoad(dashDB.issues.length ? dashDB.issues : dashIssues);
 }
 
 function getWeekStart(date) {
@@ -927,6 +1003,7 @@ function loadDemoData() {
   ];
   dashIssues = [...issues];
   dashDB.load(dashIssues);
+  idLoad(dashIssues);
   document.getElementById('demoNotice').style.display = 'block';
   applyFilters(); renderStats(); goToToday();
   dashShowComponents();
@@ -1219,6 +1296,7 @@ async function fetchDashboard() {
     const fetched = (await fetchAllIssues(cfg.proxyUrl, cfg.url, auth, jql)).map(r => mapIssue(r, cfg.url));
     dashIssues = fetched;
     dashDB.load(fetched);
+    idLoad(fetched);
     dashShowComponents();
     showToast(`✅ Dashboard DB: ${fetched.length} issues across ${dashDB.getComponents().length} components`, 'success');
   } catch(e) { showToast(`Failed: ${e.message}`, 'error'); }
@@ -1986,7 +2064,7 @@ function selectIssue(key){
 }
 
 function openIssueDetail(key){
-  const iss=issues.find(i=>i.key===key);
+  const iss=issues.find(i=>i.key===key) || dashDB.issues.find(i=>i.key===key);
   if(!iss)return;
   selectedIssue=iss;
   document.getElementById('modalKey').textContent      = iss.key;
@@ -2017,12 +2095,159 @@ function showToast(msg,type='info'){
   document.getElementById('toastArea').appendChild(el);
   setTimeout(()=>el.remove(),4000);
 }
+
+// ══ ISSUE DATA TAB ══
+let idAllRows = [];       // full dataset from dashDB
+let idFiltered = [];      // after filters
+let idSortCol = 'key';
+let idSortDir = 1;        // 1 = asc, -1 = desc
+
+const ID_COLS = [
+  { key:'key',       label:'Key',         cls:'td-key' },
+  { key:'summary',   label:'Summary',     cls:'td-summary' },
+  { key:'status',    label:'Status',      cls:'td-mono' },
+  { key:'storyType', label:'Story Type',  cls:'td-mono' },
+  { key:'priority',  label:'Priority',    cls:'td-mono' },
+  { key:'component', label:'Component',   cls:'td-mono td-trunc' },
+  { key:'assignee',  label:'Assignee',    cls:'td-mono td-trunc' },
+  { key:'startDate', label:'Start',       cls:'td-mono' },
+  { key:'dueDate',   label:'Due',         cls:'td-mono' },
+  { key:'points',    label:'Points',      cls:'td-mono' },
+  { key:'type',      label:'Issue Type',  cls:'td-mono' },
+  { key:'parentKey', label:'Parent',      cls:'td-key' },
+];
+
+function idLoad(issueArr) {
+  idAllRows = issueArr || [];
+  // Populate filter dropdowns
+  const statuses   = [...new Set(idAllRows.map(i => i.status).filter(Boolean))].sort();
+  const storyTypes = [...new Set(idAllRows.map(i => i.storyType).filter(Boolean))].sort();
+  const components = [...new Set(idAllRows.map(i => i.component).filter(Boolean))].sort();
+
+  const populate = (id, vals) => {
+    const el = document.getElementById(id);
+    const first = el.options[0];
+    el.innerHTML = '';
+    el.appendChild(first);
+    vals.forEach(v => { const o = document.createElement('option'); o.value = o.textContent = v; el.appendChild(o); });
+  };
+  populate('idStatusFilter',    statuses);
+  populate('idStoryTypeFilter', storyTypes);
+  populate('idCompFilter',      components);
+
+  document.getElementById('idTotalBadge').textContent = `${idAllRows.length} issue${idAllRows.length!==1?'s':''}`;
+  document.getElementById('idSourceNote').textContent = dashDB.lastUpdated
+    ? `from Dashboard JQL · updated ${dashDB.lastUpdated.toLocaleTimeString()}`
+    : '';
+
+  idApplyFilters();
+}
+
+function idApplyFilters() {
+  const q   = (document.getElementById('idSearch').value || '').toLowerCase();
+  const st  = document.getElementById('idStatusFilter').value;
+  const sty = document.getElementById('idStoryTypeFilter').value;
+  const cmp = document.getElementById('idCompFilter').value;
+
+  idFiltered = idAllRows.filter(i => {
+    if (st  && i.status    !== st)  return false;
+    if (sty && i.storyType !== sty) return false;
+    if (cmp && i.component !== cmp) return false;
+    if (q) {
+      const hay = `${i.key} ${i.summary} ${i.assignee} ${i.component} ${i.storyType} ${i.status}`.toLowerCase();
+      if (!hay.includes(q)) return false;
+    }
+    return true;
+  });
+
+  idSort();
+}
+
+function idSort() {
+  idFiltered.sort((a, b) => {
+    const av = (a[idSortCol] ?? '').toString();
+    const bv = (b[idSortCol] ?? '').toString();
+    return av.localeCompare(bv, undefined, {numeric:true}) * idSortDir;
+  });
+  idRender();
+}
+
+function idSetSort(col) {
+  if (idSortCol === col) { idSortDir *= -1; }
+  else { idSortCol = col; idSortDir = 1; }
+  idSort();
+}
+
+function idRender() {
+  const table  = document.getElementById('idTable');
+  const empty  = document.getElementById('idEmpty');
+  const footer = document.getElementById('idFooterCount');
+
+  if (!idAllRows.length) {
+    table.style.display = 'none'; empty.style.display = 'flex'; footer.textContent = '';
+    return;
+  }
+  empty.style.display = 'none';
+  table.style.display = 'table';
+
+  // Header
+  document.getElementById('idThead').innerHTML = `<tr>${ID_COLS.map(c => {
+    const sortCls = idSortCol === c.key ? (idSortDir === 1 ? 'sort-asc' : 'sort-desc') : '';
+    return `<th class="${sortCls}" onclick="idSetSort('${c.key}')">${c.label}</th>`;
+  }).join('')}</tr>`;
+
+  // Body — cap at 2000 rows for DOM perf
+  const rows = idFiltered.slice(0, 2000);
+  document.getElementById('idTbody').innerHTML = rows.map(i => {
+    const scls = getStatusClass(i.status);
+    return `<tr ondblclick="openIssueDetail('${i.key}')">
+      ${ID_COLS.map(c => {
+        if (c.key === 'key') {
+          const link = i.url ? `<a href="${i.url}" target="_blank" style="color:var(--accent);text-decoration:none">${i.key}</a>` : i.key;
+          return `<td class="td-key">${link}</td>`;
+        }
+        if (c.key === 'status') {
+          return `<td class="td-mono"><span class="status-badge ${scls}">${i.status||'—'}</span></td>`;
+        }
+        if (c.key === 'summary') {
+          return `<td class="td-summary" title="${(i.summary||'').replace(/"/g,'&quot;')}">${i.summary||'—'}</td>`;
+        }
+        const val = i[c.key] ?? '—';
+        return `<td class="${c.cls}" title="${String(val).replace(/"/g,'&quot;')}">${val}</td>`;
+      }).join('')}
+    </tr>`;
+  }).join('');
+
+  footer.textContent = idFiltered.length !== idAllRows.length
+    ? `Showing ${idFiltered.length} of ${idAllRows.length} issues`
+    : `${idAllRows.length} issues`;
+  if (idFiltered.length > 2000) footer.textContent += ' (first 2000 shown)';
+}
+
+function idExportCSV() {
+  if (!idFiltered.length) { showToast('No data to export', 'error'); return; }
+  const header = ID_COLS.map(c => c.label).join(',');
+  const rows = idFiltered.map(i =>
+    ID_COLS.map(c => {
+      const v = String(i[c.key] ?? '').replace(/"/g,'""');
+      return `"${v}"`;
+    }).join(',')
+  );
+  const csv = [header, ...rows].join('\n');
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([csv], {type:'text/csv'}));
+  a.download = `jira-issues-${new Date().toISOString().slice(0,10)}.csv`;
+  a.click(); URL.revokeObjectURL(a.href);
+  showToast(`Exported ${idFiltered.length} rows`, 'success');
+}
+
 document.querySelectorAll('.modal-overlay').forEach(o=>{
   o.addEventListener('click',e=>{if(e.target===o)o.classList.remove('open');});
 });
-document.addEventListener('keydown',e=>{
-  if(e.key==='Escape') document.querySelectorAll('.modal-overlay.open').forEach(m=>m.classList.remove('open'));
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') document.querySelectorAll('.modal-overlay.open').forEach(m => m.classList.remove('open'));
 });
+
 </script>
 </body>
 </html>
